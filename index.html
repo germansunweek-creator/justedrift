@@ -35,7 +35,6 @@
     padding: 0 20px 80px;
   }
 
-  /* ===== Hero ===== */
   .hero {
     width: 100%;
     max-width: 900px;
@@ -95,7 +94,6 @@
     margin-top: 12px;
   }
 
-  /* ===== Controls ===== */
   .controls {
     width: 100%;
     max-width: 900px;
@@ -127,7 +125,6 @@
   button#refreshBtn:active { transform: translateY(0); }
   button#refreshBtn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
 
-  /* ===== Table ===== */
   table.leaderboard {
     width: 100%;
     max-width: 900px;
@@ -146,192 +143,4 @@
     color: var(--muted);
     background: var(--panel-2);
     padding: 14px 20px;
-    border-bottom: 1px solid var(--line);
-  }
-  table.leaderboard thead th.col-rank { width: 70px; }
-  table.leaderboard thead th.col-score { text-align: right; width: 120px; }
-  table.leaderboard tbody td {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--line);
-    vertical-align: middle;
-  }
-  table.leaderboard tbody tr:last-child td { border-bottom: none; }
-  table.leaderboard tbody tr:nth-child(odd) { background: var(--panel-2); }
-  table.leaderboard tbody tr.top1 td { background: rgba(255,138,30,0.08); }
-  table.leaderboard tbody tr.top1 { box-shadow: inset 3px 0 0 var(--amber); }
-  table.leaderboard tbody tr.top2 { box-shadow: inset 3px 0 0 #b9c0cc; }
-  table.leaderboard tbody tr.top3 { box-shadow: inset 3px 0 0 #c98a4b; }
-  .td-rank {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--muted);
-  }
-  tr.top1 .td-rank { color: var(--amber-2); font-size: 16px; }
-  .td-name {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 600;
-    font-size: 15px;
-    text-transform: uppercase;
-  }
-  .td-car {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-  .td-score {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: 16px;
-    color: var(--cyan);
-    text-align: right;
-  }
-  tr.top1 .td-score { color: var(--amber-2); font-size: 18px; }
-
-  .empty, .error {
-    width: 100%;
-    max-width: 900px;
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-  .error { color: #ff6b6b; }
-
-  footer {
-    margin-top: 40px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: #4a505c;
-    letter-spacing: 0.05em;
-  }
-
-  @media (max-width: 640px) {
-    table.leaderboard thead th.col-score { width: 90px; }
-  }
-</style>
-</head>
-<body>
-
-  <div class="hero">
-    <div class="skidmark"></div>
-    <div class="eyebrow">Assetto Corsa &middot; Serveur communautaire</div>
-    <h1>JUST <span>DRIFT</span></h1>
-    <div class="subtitle">Classement partagé — zone de drift</div>
-  </div>
-
-  <div class="controls">
-    <div class="status" id="statusText">Chargement...</div>
-    <button id="refreshBtn">Actualiser</button>
-  </div>
-
-  <div id="tableWrap" style="width:100%; display:flex; justify-content:center;">
-    <table class="leaderboard" id="leaderboardTable" style="display:none;">
-      <thead>
-        <tr>
-          <th class="col-rank">Rang</th>
-          <th>Pilote</th>
-          <th class="col-score">Score</th>
-        </tr>
-      </thead>
-      <tbody id="leaderboardBody"></tbody>
-    </table>
-  </div>
-  <div id="emptyState" class="empty" style="display:none;">Aucun score enregistré pour le moment. Sois le premier à envoyer un temps !</div>
-  <div id="errorState" class="error" style="display:none;"></div>
-
-  <footer>JUST DRIFT — DRIFT ZONE CHALLENGE</footer>
-
-<script>
-  const SHEETY_URL = "https://api.sheety.co/97a1c625d8087df7f49cea7d676980ee/leaderboard/leaderboard";
-
-  const statusText = document.getElementById('statusText');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const tableEl = document.getElementById('leaderboardTable');
-  const bodyEl = document.getElementById('leaderboardBody');
-  const emptyEl = document.getElementById('emptyState');
-  const errorEl = document.getElementById('errorState');
-
-  function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.textContent = str == null ? '' : String(str);
-    return d.innerHTML;
-  }
-
-  function medal(rank) {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return '#' + rank;
-  }
-
-  async function loadLeaderboard() {
-    refreshBtn.disabled = true;
-    statusText.textContent = 'Chargement...';
-    errorEl.style.display = 'none';
-    emptyEl.style.display = 'none';
-
-    try {
-      const res = await fetch(SHEETY_URL);
-      if (!res.ok) {
-        throw new Error('HTTP ' + res.status);
-      }
-      const data = await res.json();
-      const rows = data.leaderboard || [];
-
-      const bestByPlayer = {};
-      for (const row of rows) {
-        const name = (row.name || '?').toString();
-        const score = Number(row.score || 0);
-        if (!bestByPlayer[name] || score > bestByPlayer[name].score) {
-          bestByPlayer[name] = { name, car: row.car || '', score };
-        }
-      }
-      const list = Object.values(bestByPlayer).sort((a, b) => b.score - a.score);
-
-      render(list);
-      const now = new Date();
-      statusText.textContent = 'Mis à jour à ' + now.toLocaleTimeString('fr-FR');
-    } catch (err) {
-      tableEl.style.display = 'none';
-      errorEl.style.display = 'block';
-      errorEl.textContent = "Impossible de charger le classement (" + err.message + "). Réessaie dans un instant.";
-      statusText.textContent = 'Erreur';
-    } finally {
-      refreshBtn.disabled = false;
-    }
-  }
-
-  function render(list) {
-    if (list.length === 0) {
-      tableEl.style.display = 'none';
-      emptyEl.style.display = 'block';
-      return;
-    }
-
-    const topClass = ['top1', 'top2', 'top3'];
-    bodyEl.innerHTML = list.map((p, i) => {
-      const rank = i + 1;
-      const cls = topClass[i] ? ' class="' + topClass[i] + '"' : '';
-      return `
-        <tr${cls}>
-          <td class="td-rank">${rank <= 3 ? medal(rank) : '#' + rank}</td>
-          <td>
-            <div class="td-name">${escapeHtml(p.name)}</div>
-            <div class="td-car">${escapeHtml(p.car)}</div>
-          </td>
-          <td class="td-score">${Math.floor(p.score)}</td>
-        </tr>`;
-    }).join('');
-    tableEl.style.display = 'table';
-
-    emptyEl.style.display = 'none';
-    errorEl.style.display = 'none';
-  }
-
-  refreshBtn.addEventListener('click', loadLeaderboard);
-  loadLeaderboard();
-</script>
-
-</body>
-</html>
+    border-bottom: 1px solid
