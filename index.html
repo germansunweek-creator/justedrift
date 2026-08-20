@@ -214,7 +214,7 @@
     <div class="skidmark"></div>
     <div class="eyebrow">Assetto Corsa &middot; Serveur communautaire</div>
     <h1>JUST <span>DRIFT</span></h1>
-    <div class="subtitle">Classement partagé — zone de drift</div>
+    <div class="subtitle">Classement partagé — par tracé</div>
   </div>
 
   <div class="controls">
@@ -222,18 +222,7 @@
     <button id="refreshBtn">Actualiser</button>
   </div>
 
-  <div id="tableWrap" style="width:100%; display:flex; justify-content:center;">
-    <table class="leaderboard" id="leaderboardTable" style="display:none;">
-      <thead>
-        <tr>
-          <th class="col-rank">Rang</th>
-          <th>Pilote</th>
-          <th class="col-score">Score</th>
-        </tr>
-      </thead>
-      <tbody id="leaderboardBody"></tbody>
-    </table>
-  </div>
+  <div id="tableWrap" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:36px;"></div>
   <div id="emptyState" class="empty" style="display:none;">Aucun score enregistré pour le moment. Sois le premier à envoyer un temps !</div>
   <div id="errorState" class="error" style="display:none;"></div>
 
@@ -242,10 +231,14 @@
 <script>
   const SHEETY_URL = "https://api.sheety.co/97a1c625d8087df7f49cea7d676980ee/leaderboard/leaderboard";
 
+  const ZONE_LABELS = [
+    { key: 'foret', label: 'FORET' },
+    { key: 'circuit', label: 'CIRCUIT' },
+  ];
+
   const statusText = document.getElementById('statusText');
   const refreshBtn = document.getElementById('refreshBtn');
-  const tableEl = document.getElementById('leaderboardTable');
-  const bodyEl = document.getElementById('leaderboardBody');
+  const tableWrap = document.getElementById('tableWrap');
   const emptyEl = document.getElementById('emptyState');
   const errorEl = document.getElementById('errorState');
 
@@ -276,23 +269,33 @@
       const data = await res.json();
       const rows = data.leaderboard || [];
 
-      const bestByPlayerCar = {};
+      const bestByZonePlayerCar = {};
       for (const row of rows) {
+        const zone = (row.zone || '?').toString();
         const name = (row.name || '?').toString();
         const car = (row.car || '?').toString();
-        const key = name + '||' + car;
+        const key = zone + '||' + name + '||' + car;
         const score = Number(row.score || 0);
-        if (!bestByPlayerCar[key] || score > bestByPlayerCar[key].score) {
-          bestByPlayerCar[key] = { name, car, score };
+        if (!bestByZonePlayerCar[key] || score > bestByZonePlayerCar[key].score) {
+          bestByZonePlayerCar[key] = { zone, name, car, score };
         }
       }
-      const list = Object.values(bestByPlayerCar).sort((a, b) => b.score - a.score);
 
-      render(list);
+      const grouped = {};
+      for (const key in bestByZonePlayerCar) {
+        const entry = bestByZonePlayerCar[key];
+        if (!grouped[entry.zone]) grouped[entry.zone] = [];
+        grouped[entry.zone].push(entry);
+      }
+      for (const zone in grouped) {
+        grouped[zone].sort((a, b) => b.score - a.score);
+      }
+
+      render(grouped);
       const now = new Date();
       statusText.textContent = 'Mis à jour à ' + now.toLocaleTimeString('fr-FR');
     } catch (err) {
-      tableEl.style.display = 'none';
+      tableWrap.innerHTML = '';
       errorEl.style.display = 'block';
       errorEl.textContent = "Impossible de charger le classement (" + err.message + "). Réessaie dans un instant.";
       statusText.textContent = 'Erreur';
@@ -301,15 +304,9 @@
     }
   }
 
-  function render(list) {
-    if (list.length === 0) {
-      tableEl.style.display = 'none';
-      emptyEl.style.display = 'block';
-      return;
-    }
-
+  function renderZoneTable(label, list) {
     const topClass = ['top1', 'top2', 'top3'];
-    bodyEl.innerHTML = list.map((p, i) => {
+    const rowsHtml = list.map((p, i) => {
       const rank = i + 1;
       const cls = topClass[i] ? ' class="' + topClass[i] + '"' : '';
       return `
@@ -322,9 +319,49 @@
           <td class="td-score">${Math.floor(p.score)}</td>
         </tr>`;
     }).join('');
-    tableEl.style.display = 'table';
 
-    emptyEl.style.display = 'none';
+    const wrap = document.createElement('div');
+    wrap.style.width = '100%';
+    wrap.style.maxWidth = '900px';
+    wrap.innerHTML = `
+      <h2 style="font-family:'Oswald',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:18px; color:var(--amber-2); margin:0 0 12px;">${escapeHtml(label)}</h2>
+      <table class="leaderboard">
+        <thead>
+          <tr>
+            <th class="col-rank">Rang</th>
+            <th>Pilote</th>
+            <th class="col-score">Score</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+    return wrap;
+  }
+
+  function render(grouped) {
+    tableWrap.innerHTML = '';
+    let anyData = false;
+
+    for (const { key, label } of ZONE_LABELS) {
+      const list = grouped[key];
+      if (list && list.length > 0) {
+        anyData = true;
+        tableWrap.appendChild(renderZoneTable(label, list));
+      }
+    }
+
+    for (const zoneKey in grouped) {
+      if (!ZONE_LABELS.some(z => z.key === zoneKey) && grouped[zoneKey].length > 0) {
+        anyData = true;
+        tableWrap.appendChild(renderZoneTable(zoneKey, grouped[zoneKey]));
+      }
+    }
+
+    if (!anyData) {
+      emptyEl.style.display = 'block';
+    } else {
+      emptyEl.style.display = 'none';
+    }
     errorEl.style.display = 'none';
   }
 
